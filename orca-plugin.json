@@ -1,0 +1,46 @@
+{
+  "manifestVersion": 2,
+  "id": "spotlight",
+  "name": "Spotlight",
+  "version": "0.1.0",
+  "description": "Mirror one worktree's changes onto the repo root checkout, so a single running dev environment serves any worktree.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "spotlight",
+        "title": "Spotlight",
+        "icon": "zap",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "spotlight",
+        "text": "Spotlight off",
+        "icon": "zap",
+        "tone": "neutral",
+        "tooltip": "Spotlight: no worktree mirrored onto the repo root"
+      }
+    ],
+    "events": [
+      {
+        "on": "workspace.removed"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "workspace:read"
+    }
+  ]
+}
