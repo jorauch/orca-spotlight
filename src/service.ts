@@ -19,6 +19,8 @@ export type ListedWorkspace = { kind: string; name: string; path: string; branch
 export type ServiceDeps = {
   git: SpotlightGitContext
   listWorkspaces: () => Promise<ListedWorkspace[]>
+  /** Orca project display names by repo root path; may be empty. */
+  projectNames: () => Promise<Map<string, string>>
   load: () => Promise<unknown>
   save: (value: PersistedHolder[]) => Promise<void>
   /** Called after every state change (panel refresh, status bar). */
@@ -27,13 +29,15 @@ export type ServiceDeps = {
   debounceMs?: number
 }
 
-export type PersistedHolder = { rootPath: string; worktreePath: string; name: string }
+export type PersistedHolder = {
+  rootPath: string
+  worktreePath: string
+  name: string
+}
 
 type Holder = PersistedHolder & {
   lastSyncAt: number | null
   error: SpotlightErrorView | null
-  migrationFiles: string[]
-  snapshotSha: string | null
   reuseIndexForHead: string | null
   watcher: FSWatcher | null
   timer: ReturnType<typeof setTimeout> | null
@@ -41,7 +45,6 @@ type Holder = PersistedHolder & {
 
 /** Directories whose churn never changes the mirrored (tracked, non-ignored) tree. */
 const IGNORED_SEGMENTS = new Set(['.git', 'node_modules', 'bin', 'obj', '.nuxt', '.output'])
-const MIGRATION_SEGMENT = '/Migrations/'
 
 function canonical(path: string): string {
   try {
@@ -78,7 +81,6 @@ export class SpotlightService {
         continue
       }
       const holder = this.newHolder(entry)
-      holder.snapshotSha = refs.snapshotSha
       this.holders.set(entry.rootPath, holder)
       this.startWatcher(holder)
       void this.sync(entry.rootPath)
@@ -106,24 +108,23 @@ export class SpotlightService {
         byRoot.set(rootPath, [])
       }
     }
+    const names = await this.deps.projectNames().catch(() => new Map<string, string>())
     const repos: RepoView[] = []
     for (const [rootPath, worktrees] of byRoot) {
-      const head = await gitTry(this.deps.git, rootPath, ['symbolic-ref', '-q', '--short', 'HEAD'])
       const holder = this.holders.get(rootPath)
       repos.push({
         rootPath,
-        rootBranch: head,
+        projectName: names.get(rootPath) ?? basename(rootPath),
         worktrees: worktrees.sort((a, b) => a.name.localeCompare(b.name)),
         holder: holder ? this.view(holder) : null
       })
     }
-    return { repos: repos.sort((a, b) => a.rootPath.localeCompare(b.rootPath)) }
+    return { repos: repos.sort((a, b) => a.projectName.localeCompare(b.projectName)) }
   }
 
   activate(rootPath: string, worktreePath: string, force = false): Promise<OpResult> {
     return this.exclusive(rootPath, async () => {
       const name = basename(worktreePath)
-      const before = await this.rootContentSha(rootPath)
       try {
         const outcome = await activateSpotlightCore(this.deps.git, rootPath, worktreePath, {
           force,
@@ -134,10 +135,8 @@ export class SpotlightService {
           this.stopWatcher(previous)
         }
         const holder = this.newHolder({ rootPath, worktreePath, name })
-        holder.snapshotSha = outcome.snapshotSha
         holder.reuseIndexForHead = outcome.checkpointHeadSha
         holder.lastSyncAt = Date.now()
-        holder.migrationFiles = await this.migrationsBetween(rootPath, before, outcome.snapshotSha)
         this.holders.set(rootPath, holder)
         this.startWatcher(holder)
         await this.persist()
@@ -162,12 +161,8 @@ export class SpotlightService {
           reuseIndexForHead: holder.reuseIndexForHead
         })
         holder.reuseIndexForHead = outcome.checkpointHeadSha
-        if (!outcome.skipped) {
-          const added = await this.migrationsBetween(rootPath, holder.snapshotSha, outcome.snapshotSha)
-          holder.migrationFiles = [...new Set([...holder.migrationFiles, ...added])]
-          holder.lastSyncAt = Date.now()
-        }
-        holder.snapshotSha = outcome.snapshotSha
+        // Also on a skipped sync: the root was just confirmed to match the worktree.
+        holder.lastSyncAt = Date.now()
         holder.error = null
         return { ok: true }
       } catch (error) {
@@ -210,15 +205,6 @@ export class SpotlightService {
     })
   }
 
-  dismissMigrations(rootPath: string): OpResult {
-    const holder = this.holders.get(rootPath)
-    if (holder) {
-      holder.migrationFiles = []
-      this.publish()
-    }
-    return { ok: true }
-  }
-
   /** A removed worktree can no longer feed the root: give the root back. */
   async onWorktreeRemoved(path: string): Promise<void> {
     for (const holder of this.holders.values()) {
@@ -238,11 +224,11 @@ export class SpotlightService {
 
   private newHolder(entry: PersistedHolder): Holder {
     return {
-      ...entry,
+      rootPath: entry.rootPath,
+      worktreePath: entry.worktreePath,
+      name: entry.name,
       lastSyncAt: null,
       error: null,
-      migrationFiles: [],
-      snapshotSha: null,
       reuseIndexForHead: null,
       watcher: null,
       timer: null
@@ -254,8 +240,7 @@ export class SpotlightService {
       worktreePath: holder.worktreePath,
       name: holder.name,
       lastSyncAt: holder.lastSyncAt,
-      error: holder.error,
-      migrationFiles: holder.migrationFiles
+      error: holder.error
     }
   }
 
@@ -331,25 +316,5 @@ export class SpotlightService {
     const commonDir = this.commonDirs.get(worktreePath)
     // A bare common dir has no working root to mirror onto.
     return commonDir && basename(commonDir) === '.git' ? canonical(dirname(commonDir)) : null
-  }
-
-  /** What the root's tracked files currently are: the Spotlight snapshot, else HEAD. */
-  private async rootContentSha(rootPath: string): Promise<string | null> {
-    const refs = await inspectSpotlightRefsCore(this.deps.git, rootPath).catch(() => null)
-    return refs?.snapshotSha ?? refs?.rootHeadSha ?? null
-  }
-
-  private async migrationsBetween(
-    rootPath: string,
-    from: string | null,
-    to: string
-  ): Promise<string[]> {
-    if (!from || from === to) {
-      return []
-    }
-    const raw = await gitTry(this.deps.git, rootPath, ['diff', '--name-only', '-z', from, to])
-    return (raw ?? '')
-      .split('\0')
-      .filter((path) => path.length > 0 && `/${path}`.includes(MIGRATION_SEGMENT))
   }
 }

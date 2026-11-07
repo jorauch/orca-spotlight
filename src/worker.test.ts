@@ -76,7 +76,7 @@ test('lists worktrees per root, without the root itself', async () => {
   const { repos } = await worker.request('spotlight.state')
   assert.equal(repos.length, 1)
   assert.equal(repos[0].rootPath, root)
-  assert.equal(repos[0].rootBranch, 'main')
+  assert.equal(repos[0].projectName, 'root')
   assert.deepEqual(
     repos[0].worktrees.map((w) => w.name),
     ['wt-a', 'wt-b']
@@ -117,25 +117,6 @@ test('activate mirrors, the watcher syncs, takeover switches, deactivate restore
   assert.equal(read(root, 'local-only.txt'), 'untracked root file\n')
   assert.equal(git(root, 'rev-parse', '--abbrev-ref', 'HEAD'), 'main')
   assert.deepEqual(h.data().storage, { holders: [] })
-  await worker.deactivate()
-})
-
-test('warns about migration files the mirrored code changes', async () => {
-  const worker = await mountWorker(main, { host: host(), events: ['workspace.removed'] })
-  write(wtA, 'src/Db/Migrations/20261107_Add.cs', 'migration\n')
-  await worker.request('spotlight.activate', { rootPath: root, worktreePath: wtA })
-  let { repos } = await worker.request('spotlight.state')
-  assert.deepEqual(repos[0].holder?.migrationFiles, ['src/Db/Migrations/20261107_Add.cs'])
-
-  await worker.request('spotlight.dismissMigrations', { rootPath: root })
-  ;({ repos } = await worker.request('spotlight.state'))
-  assert.deepEqual(repos[0].holder?.migrationFiles, [])
-
-  // Switching to a worktree WITHOUT that migration is the risky direction: the DB is ahead.
-  await worker.request('spotlight.activate', { rootPath: root, worktreePath: wtB })
-  ;({ repos } = await worker.request('spotlight.state'))
-  assert.deepEqual(repos[0].holder?.migrationFiles, ['src/Db/Migrations/20261107_Add.cs'])
-  await worker.request('spotlight.deactivate', { rootPath: root })
   await worker.deactivate()
 })
 

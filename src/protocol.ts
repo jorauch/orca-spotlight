@@ -8,13 +8,12 @@ export type HolderView = {
   name: string
   lastSyncAt: number | null
   error: SpotlightErrorView | null
-  /** Migration files that differ between what the root ran before and now. */
-  migrationFiles: string[]
 }
 
 export type RepoView = {
   rootPath: string
-  rootBranch: string | null
+  /** Orca's project name for the root, else its folder name. */
+  projectName: string
   worktrees: WorktreeView[]
   holder: HolderView | null
 }
@@ -31,7 +30,6 @@ declare module 'orca' {
     }
     'spotlight.deactivate': { input: { rootPath: string; force?: boolean }; output: OpResult }
     'spotlight.sync': { input: { rootPath: string; force?: boolean }; output: OpResult }
-    'spotlight.dismissMigrations': { input: { rootPath: string }; output: OpResult }
   }
   interface PluginPanelEvents {
     /** Something changed; open panels re-read `spotlight.state`. */

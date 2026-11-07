@@ -8,19 +8,17 @@ bridge until Orca ships Spotlight itself — then remove this plugin.
 
 ## Behaviour
 
-- **Spotlight** on a worktree: the root's current state (branch, HEAD, staged and unstaged
+- The **bolt** on a worktree turns Spotlight on: the root's current state (branch, HEAD, staged and unstaged
   changes) is backed up under `refs/spotlight-plugin/*`, the root is detached, and the worktree's
   tracked and new non-ignored files are mirrored onto it (`reset --hard` to a checkpoint commit).
 - A file watcher re-syncs 750 ms after the last change in the worktree.
-- **Spotlight** on another worktree takes over; the original root backup is kept.
-- **Turn off** restores the root exactly: original branch, HEAD, staged and unstaged changes.
+- The bolt on another worktree takes over (one holder per root); the original root backup is kept.
+- The lit bolt turns it off and restores the root exactly: original branch, HEAD, staged and unstaged changes.
 - Untracked and ignored root files (`.env`, `node_modules`, `bin/obj`) are never touched.
 - Edits or commits made directly in the root block sync and turn-off (`root-diverged`) instead of
-  being destroyed; **Force sync** / **Force turn off** discard them deliberately.
-- A changed file under `**/Migrations/**` raises a warning: the shared database may be ahead of or
-  behind the mirrored code.
+  being destroyed; **Force sync** / **Force turn off** (in the row's details) discard them deliberately.
 - Removing the holding worktree in Orca turns Spotlight off.
-- The status bar shows the holder (accent), a migration warning (warning) or an error (danger).
+- The status bar shows the holder (accent) or an error (danger).
 - Local repos only (no SSH/WSL). Uses its own ref prefix, so it never touches the state of a
   built-in Orca Spotlight.
 
