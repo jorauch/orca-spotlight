@@ -5,8 +5,8 @@ import * as panel from './panel'
 
 function repo(holder: RepoView['holder'] = null): RepoView {
   return {
-    rootPath: '/dev/tessa-next',
-    projectName: 'tessa-core',
+    rootPath: '/dev/my-app',
+    projectName: 'my-app',
     worktrees: [
       { name: 'fix-a', path: '/ws/fix-a', branch: 'fix/1-a' },
       { name: 'feat-b', path: '/ws/feat-b', branch: 'feat/2-b' }
@@ -40,7 +40,7 @@ test('one switch per worktree: on activates, another takes over, off deactivates
     }
   })
   const view = await mount(panel, { host })
-  assert.ok(view.find({ text: 'tessa-core' }))
+  assert.ok(view.find({ text: 'my-app' }))
   const on = (id: string) => view.find({ testId: id })?.props?.variant === 'solid'
   assert.equal(on('/ws/fix-a'), false)
   assert.equal(on('/ws/feat-b'), false)

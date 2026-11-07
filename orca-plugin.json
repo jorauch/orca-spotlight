@@ -4,6 +4,12 @@
   "name": "Spotlight",
   "version": "0.1.0",
   "description": "Mirror one worktree's changes onto the repo root checkout, so a single running dev environment serves any worktree.",
+  "author": {
+    "name": "Johannes Rauch",
+    "url": "https://github.com/jorauch"
+  },
+  "repository": "https://github.com/jorauch/orca-spotlight",
+  "license": "MIT",
   "engines": {
     "orca": ">=1.4.248"
   },

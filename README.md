@@ -1,30 +1,89 @@
-# Spotlight
+# Spotlight for Orca
 
-Orca plugin: mirror one worktree's changes onto the repo root checkout, so a single running dev
-environment (dev server, Docker stack, installed dependencies) serves whichever worktree you pick.
+An [Orca](https://www.onorca.dev) plugin that mirrors one worktree's changes onto the repo root
+checkout, so a single running dev environment (dev server, Docker stack, installed dependencies)
+serves whichever worktree you pick. Useful when a project is too heavy to run once per worktree.
+
 Modelled on Conductor's Spotlight; the git engine is adapted from
 [stablyai/orca#7067](https://github.com/stablyai/orca/pull/7067) (see `NOTICE.md`). Meant as a
 bridge until Orca ships Spotlight itself — then remove this plugin.
 
+## Requirements
+
+- Orca **1.4.248** or newer, with plugins turned on (Settings → Plugins → **Turn on plugins**)
+- macOS; local git repositories (SSH and WSL workspaces are not supported)
+- The repo root checkout on a branch (not detached) when you first turn Spotlight on
+
+## Install
+
+### From a clone (works on every supported Orca)
+
+1. Clone the repository somewhere it can stay:
+
+   ```sh
+   git clone https://github.com/jorauch/orca-spotlight.git ~/dev/orca-spotlight
+   ```
+
+2. In Orca, open Settings → Plugins → **Development folders…** and add `~/dev/orca-spotlight`.
+3. Review the requested access and enable the plugin. It runs its own Node worker with your
+   user account's rights (to run `git` and watch files), so Orca asks for your approval once.
+
+Or from a terminal:
+
+```sh
+orca plugin dev load ~/dev/orca-spotlight
+# prints the requested access and a fingerprint; after reviewing it:
+orca plugin dev load ~/dev/orca-spotlight --approve <fingerprint>
+```
+
+Update with `git -C ~/dev/orca-spotlight pull`; Orca reloads the plugin by itself.
+
+### With `orca plugin install` (newer Orca)
+
+Orca versions that ship `orca plugin install` can install a tagged release straight from GitHub:
+
+```sh
+orca plugin install jorauch/orca-spotlight@v0.1.0
+orca plugin update            # later, to move to a newer release
+```
+
+## Use
+
+1. Open the **Spotlight** panel (bolt icon) in Orca's right sidebar. It lists your worktrees,
+   grouped by project.
+2. Click the **bolt** next to a worktree. Its code is mirrored onto the repo root, and every
+   further change in the worktree follows within about a second. The dot before the title turns
+   green, the status bar shows the worktree.
+3. Click the bolt of **another** worktree to switch: only one worktree per project holds the
+   Spotlight.
+4. Click the **lit bolt** to turn Spotlight off. The root returns exactly to where it was.
+
+While a switch runs, a spinner replaces the bolt. A red dot and an arrow mean an error; click the
+arrow for details and, where it applies, **Force sync** / **Force turn off**.
+
 ## Behaviour
 
-- The **bolt** on a worktree turns Spotlight on: the root's current state (branch, HEAD, staged and unstaged
-  changes) is backed up under `refs/spotlight-plugin/*`, the root is detached, and the worktree's
-  tracked and new non-ignored files are mirrored onto it (`reset --hard` to a checkpoint commit).
+- Turning Spotlight on backs up the root's state (branch, HEAD, staged and unstaged changes) under
+  `refs/spotlight-plugin/*`, detaches the root, and resets it to a checkpoint commit of the
+  worktree's tracked and new non-ignored files.
 - A file watcher re-syncs 750 ms after the last change in the worktree.
-- The bolt on another worktree takes over (one holder per root); the original root backup is kept.
-- The lit bolt turns it off and restores the root exactly: original branch, HEAD, staged and unstaged changes.
+- Switching keeps the original root backup; turning off restores branch, HEAD, staged and
+  unstaged changes.
 - Untracked and ignored root files (`.env`, `node_modules`, `bin/obj`) are never touched.
 - Edits or commits made directly in the root block sync and turn-off (`root-diverged`) instead of
-  being destroyed; **Force sync** / **Force turn off** (in the row's details) discard them deliberately.
+  being destroyed; **Force sync** / **Force turn off** discard them deliberately.
 - Removing the holding worktree in Orca turns Spotlight off.
-- The status bar shows the holder (accent) or an error (danger).
-- Local repos only (no SSH/WSL). Uses its own ref prefix, so it never touches the state of a
-  built-in Orca Spotlight.
+- The plugin does not look at databases: if worktrees carry different migrations, migrate or roll
+  back yourself after switching.
 
 Recovery by hand, if ever needed:
-`git stash apply --index refs/spotlight-plugin/backup` restores the root's original changes on top
-of `git reset --hard refs/spotlight-plugin/original-head`.
+`git reset --hard refs/spotlight-plugin/original-head`, then
+`git stash apply --index refs/spotlight-plugin/backup` restores the root's original changes.
+
+## Uninstall
+
+Turn Spotlight off first (so the root is restored), then remove the folder under Settings →
+Plugins → Development folders, or run `orca plugin dev unload ~/dev/orca-spotlight`.
 
 ## Develop
 
@@ -37,3 +96,7 @@ orca plugin logs local.spotlight
 
 `npx tsc -p .` needs the typings from `orca plugin types .`, which fails on Orca 1.4.251 (its app
 bundle lacks `orca.d.ts`); the tests are the check until then.
+
+## License
+
+MIT, see `LICENSE`. Third-party notices in `NOTICE.md`.
