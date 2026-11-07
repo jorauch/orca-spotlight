@@ -12,6 +12,7 @@ import {
   type SpotlightGitContext
 } from './engine/core'
 import { gitTry } from './engine/git-exec'
+import { realPathKey } from './engine/path-key'
 import type { HolderView, OpResult, RepoView, SpotlightErrorView, WorktreeView } from './protocol'
 
 export type ListedWorkspace = { kind: string; name: string; path: string; branch: string | null }
@@ -19,7 +20,7 @@ export type ListedWorkspace = { kind: string; name: string; path: string; branch
 export type ServiceDeps = {
   git: SpotlightGitContext
   listWorkspaces: () => Promise<ListedWorkspace[]>
-  /** Orca project display names by repo root path; may be empty. */
+  /** Orca project display names keyed by `realPathKey` of the repo root; may be empty. */
   projectNames: () => Promise<Map<string, string>>
   load: () => Promise<unknown>
   save: (value: PersistedHolder[]) => Promise<void>
@@ -96,7 +97,7 @@ export class SpotlightService {
         continue
       }
       const rootPath = await this.rootOf(workspace.path)
-      if (!rootPath || rootPath === canonical(workspace.path)) {
+      if (!rootPath || realPathKey(rootPath) === realPathKey(workspace.path)) {
         continue
       }
       const list = byRoot.get(rootPath) ?? []
@@ -114,7 +115,7 @@ export class SpotlightService {
       const holder = this.holders.get(rootPath)
       repos.push({
         rootPath,
-        projectName: names.get(rootPath) ?? basename(rootPath),
+        projectName: names.get(realPathKey(rootPath)) ?? basename(rootPath),
         worktrees: worktrees.sort((a, b) => a.name.localeCompare(b.name)),
         holder: holder ? this.view(holder) : null
       })
@@ -208,7 +209,7 @@ export class SpotlightService {
   /** A removed worktree can no longer feed the root: give the root back. */
   async onWorktreeRemoved(path: string): Promise<void> {
     for (const holder of this.holders.values()) {
-      if (canonical(holder.worktreePath) === canonical(path) || holder.worktreePath === path) {
+      if (realPathKey(holder.worktreePath) === realPathKey(path)) {
         this.stopWatcher(holder)
         const result = await this.deactivate(holder.rootPath)
         this.deps.log(`worktree removed, deactivate: ${JSON.stringify(result)}`)

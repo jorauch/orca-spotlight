@@ -1,8 +1,8 @@
 // Adapted from stablyai/orca PR #7067 (MIT, see NOTICE.md).
 // Git primitives and guards for the Spotlight sync engine. The transport-
 // agnostic executor and low-level runners live in ./spotlight-git-exec.
-import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { realPathKey } from './path-key'
 import type { SpotlightRefsSnapshot } from './types'
 import { SPOTLIGHT_REFS } from './types'
 import {
@@ -303,7 +303,7 @@ export async function assertWorktreeBelongsToRoot(
   if (
     !rootCommon ||
     !worktreeCommon ||
-    canonicalPath(rootCommon) !== canonicalPath(worktreeCommon)
+    realPathKey(rootCommon) !== realPathKey(worktreeCommon)
   ) {
     throw new SpotlightCoreError(
       'worktree-not-found',
@@ -335,13 +335,4 @@ async function resolveGitCommonDir(
     .filter((line) => line.length > 0 && !line.startsWith('-'))
     .at(-1)
   return pathLine ? resolve(cwdPath, pathLine) : null
-}
-
-/** macOS only: resolve symlinks (/tmp -> /private/tmp) before comparing. */
-function canonicalPath(value: string): string {
-  try {
-    return realpathSync(value).normalize('NFC')
-  } catch {
-    return value.normalize('NFC')
-  }
 }

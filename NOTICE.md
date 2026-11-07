@@ -1,6 +1,6 @@
 # Notice
 
-`src/engine/` (except `local-git.ts` and `expect-shim.ts`) is adapted from the Spotlight
+`src/engine/` (except `local-git.ts`, `expect-shim.ts` and `path-key.test.ts`) is adapted from the Spotlight
 sync engine in stablyai/orca pull request #7067
 (https://github.com/stablyai/orca/pull/7067) by JuanEliasJabib02, licensed under MIT:
 

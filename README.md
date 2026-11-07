@@ -11,8 +11,27 @@ bridge until Orca ships Spotlight itself — then remove this plugin.
 ## Requirements
 
 - Orca **1.4.248** or newer, with plugins turned on (Settings → Plugins → **Turn on plugins**)
-- macOS; local git repositories (SSH and WSL workspaces are not supported)
-- The repo root checkout on a branch (not detached) when you first turn Spotlight on
+- `git` reachable from Orca (on macOS the Xcode Command Line Tools or Homebrew git); 2.31 or newer
+  recommended
+- The repository added to Orca, and its worktrees known to Orca as workspaces — the panel lists
+  only those
+- A regular (non-bare) root checkout, on a branch when you first turn Spotlight on, with no merge,
+  rebase or cherry-pick in progress
+- A dev server in the root that picks up file changes (hot reload or watch mode); otherwise the
+  mirrored code only takes effect after a restart
+
+No Node.js install, npm packages or external file watcher are needed: the plugin runs in Orca's
+own Node and watches files with its built-in `fs.watch`.
+
+### Platforms
+
+| Platform | Status |
+| -------- | ------ |
+| macOS | Tested |
+| Linux | Untested; should work. Large repos can exceed `fs.inotify.max_user_watches` — raise it with `sysctl` if the watcher fails |
+| Windows (native) | Untested; paths are compared case-insensitively with `\` and `/` folded. Dev servers that lock files can make a sync fail; it retries once |
+| Windows with repos in WSL | Not supported |
+| SSH workspaces | Not supported |
 
 ## Install
 

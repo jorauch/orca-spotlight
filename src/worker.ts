@@ -1,10 +1,10 @@
 // The plugin's worker: wires the Spotlight service to Orca. The status bar item keeps this
 // worker running while the plugin is enabled, so the file watcher survives idle periods.
 import { execFile } from 'node:child_process'
-import { realpathSync } from 'node:fs'
 import { promisify } from 'node:util'
 import type { OrcaWorkerApi } from 'orca/worker'
 import { createLocalGitContext } from './engine/local-git'
+import { realPathKey } from './engine/path-key'
 import type { HolderView } from './protocol'
 import { SpotlightService, type ListedWorkspace, type PersistedHolder } from './service'
 
@@ -12,21 +12,13 @@ const HOLDERS_KEY = 'holders'
 const ORCA_CLI = ['orca', '/Applications/Orca.app/Contents/Resources/bin/orca']
 const execFileAsync = promisify(execFile)
 
-function canonical(path: string): string {
-  try {
-    return realpathSync(path)
-  } catch {
-    return path
-  }
-}
-
 /** Project names as Orca's sidebar shows them; the host API has no project list yet. */
 async function projectNames(): Promise<Map<string, string>> {
   for (const cli of ORCA_CLI) {
     try {
       const { stdout } = await execFileAsync(cli, ['repo', 'list', '--json'], { timeout: 5000 })
       const repos = JSON.parse(stdout).result.repos as { path: string; displayName: string }[]
-      return new Map(repos.map((repo) => [canonical(repo.path), repo.displayName]))
+      return new Map(repos.map((repo) => [realPathKey(repo.path), repo.displayName]))
     } catch {
       // Try the next location; callers fall back to folder names.
     }
